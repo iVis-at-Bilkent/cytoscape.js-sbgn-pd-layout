@@ -7,6 +7,7 @@
 
 		<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1, maximum-scale=1">
 
+                <script src="http://code.jquery.com/jquery-2.0.3.min.js"></script>
 		<script src="http://cytoscape.github.io/cytoscape.js/api/cytoscape.js-latest/cytoscape.min.js"></script>
 
 		<!-- for testing with local version of cytoscape.js -->
@@ -21,12 +22,10 @@
 			}
 
 			#cy {
-				position: absolute;
-				left: 0;
-				top: 0;
-				bottom: 0;
-				right: 0;
 				z-index: 999;
+				width: 85%;
+				height: 85%;
+				float: left;
 			}
 
 			h1 {
@@ -92,15 +91,37 @@
 						]
 					},
 				});
+                                
+                                document.getElementById("chooseFile").addEventListener("click", function () {
+                                        cy.chooseFile();
+                                        $('#chooseFileInput').trigger('click');
+                                });
 
-
+                                document.getElementById("sbgnPdLayout").addEventListener("click", function () {
+                                        cy.layout();
+                                });
+                                
+                                $('#chooseFile').trigger('click');
+                                //$('#sbgnPdLayout').trigger('click');
 			});
-		</script>
+                </script>
+                
+                <script>
+                    
+                </script>
+                
 	</head>
 
 	<body>
 		<h1>cytoscape-sbgn-pd-layout demo</h1>
 
+                <!--  <br/> -->
+                <b id="sbgnPdLayout" style="cursor: pointer;color: blueviolet">Automatic Placement</b> <br/>
+                <b id="chooseFile" style="cursor: pointer;color: darkred">Choose an SBGN Model</b>
+                
+                <input id="chooseFileInput" type="file" style="visibility:hidden" />
+                
+                
 		<div id="cy"></div>
 
 	</body>

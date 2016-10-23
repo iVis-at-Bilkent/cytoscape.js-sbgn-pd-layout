@@ -1,4 +1,4 @@
-;(function(){ 'use strict';
+(function(){ 'use strict';
 
   // registers the extension on a cytoscape lib ref
   var register = function( cytoscape ){
@@ -22,11 +22,21 @@
       return tgt;
     };
 
-    function Layout( options ){
-      this.options = extend( {}, defaults, options );
+    function Layout( options )
+    {
+        this.options = extend( {}, defaults, options );
     }
-
-    Layout.prototype.run = function(){
+    
+    function chooseFile ()
+    {
+        console.log("Choose File");
+        
+    }
+    
+    Layout.prototype.run = function ()
+    {
+         console.log("SBGN Layout");
+        
       var layout = this;
       var options = this.options;
       var cy = options.cy;
@@ -167,8 +177,10 @@
 
       return this; // chaining
     };
-
-    cytoscape( 'layout', 'sbgnPdLayout', Layout ); // register with cytoscape.js
+    
+    cytoscape( "core", "chooseFile", chooseFile );
+    
+    cytoscape( "layout", "sbgnPdLayout", Layout ); // register with cytoscape.js
 
   };
 
