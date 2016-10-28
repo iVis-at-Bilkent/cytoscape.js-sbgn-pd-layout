@@ -1,3 +1,5 @@
+/* global sbgnmlToJson, text */
+
 (function(){ 'use strict';
 
   // registers the extension on a cytoscape lib ref
@@ -22,15 +24,33 @@
       return tgt;
     };
 
+    function loadSBGNMLFile(file) 
+    {
+        var reader = new FileReader();
+        
+        reader.onload = function (e) 
+        {
+            console.log("Parsing started.");
+            
+            var cy = document.getElementById('cy');
+            
+            var cytoscapeJsGraph = sbgnmlToJson.convert(textToXmlObject(reader.result));
+            var xmlObject = textToXmlObject(reader.result);
+            
+            //loadSBGNMLText(reader.result);
+            cy.json(xmlObject);
+            console.log("Parsing end.");
+        };
+      
+        reader.readAsText(file);
+        
+        console.log("Ready State [OUT]: " + reader.readyState);
+        //setFileContent(file.name);
+    };
+
     function Layout( options )
     {
         this.options = extend( {}, defaults, options );
-    }
-    
-    function chooseFile ()
-    {
-        console.log("Choose File");
-        
     }
     
     Layout.prototype.run = function ()
@@ -177,8 +197,8 @@
 
       return this; // chaining
     };
-    
-    cytoscape( "core", "chooseFile", chooseFile );
+
+    cytoscape( "core", "loadSBGNMLFile", loadSBGNMLFile );
     
     cytoscape( "layout", "sbgnPdLayout", Layout ); // register with cytoscape.js
 
