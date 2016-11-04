@@ -9,4 +9,4 @@ for (var prop in FDLayoutEdge) {
   CoSEEdge[prop] = FDLayoutEdge[prop];
 }
 
-module.exports = CoSEEdge
+module.exports = CoSEEdge;
