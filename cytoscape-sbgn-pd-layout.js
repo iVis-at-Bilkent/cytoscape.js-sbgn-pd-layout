@@ -55,19 +55,28 @@
     
     Layout.prototype.run = function ()
     {
-         console.log("SBGN Layout");
+        console.log("SBGN Layout");
         
-      var layout = this;
-      var options = this.options;
-      var cy = options.cy;
-      var eles = options.eles;
-      var nodes = eles.nodes();
+        var layout = this;
+        var options = this.options;
+        var cy = options.cy;
+        var eles = options.eles;
+        var nodes = eles.nodes();
 
-      var getRandomPos = function( i, ele ){
-        return {
-          x: Math.round( Math.random() * 100 ),
-          y: Math.round( Math.random() * 100 )
-        };
+        var getRandomPos = function( i, ele )
+        {
+            console.log("index: " + i + ", posX: " + ele.position("x") + ", posY: " + ele.position("y"));
+            
+            /*node.position(
+            {
+                x: oldX + positionDiff.x,
+                y: oldY + positionDiff.y
+            });*/
+            
+            return {
+                x: Math.round( Math.random() * 100 ),
+                y: Math.round( Math.random() * 100 )
+            };
       };
 
       // dicrete/synchronous layouts can just use this helper and all the
