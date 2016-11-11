@@ -43,6 +43,8 @@ var VisibilityGraph = require('./VisibilityGraph');
 _SbgnPDLayout.idToLNode = {};
 _SbgnPDLayout.toBeTiled = {};
 
+// TODO: Bunlar layout default'lari mi? Yoksa CoSE specific default'lar mi?
+
 var defaults = {
     // Called on `layoutready`
     ready: function () {
@@ -108,7 +110,7 @@ function _SbgnPDLayout(options) {
 
 _SbgnPDLayout.getUserOptions = function (options) 
 {
-    /** TODO: Check if we need more constats to set */
+    /** TODO: Do we need more constansts (SBGN specific) here? */
     
     if (options.nodeRepulsion != null)
         SbgnPDConstants.DEFAULT_REPULSION_STRENGTH = CoSEConstants.DEFAULT_REPULSION_STRENGTH = FDLayoutConstants.DEFAULT_REPULSION_STRENGTH = options.nodeRepulsion;
@@ -145,7 +147,6 @@ _SbgnPDLayout.prototype.run = function () {
 
     this.cy.trigger('layoutstart');
 
-    /** TODO: Implement the layout logic here! */
     var gm = _SbgnPDLayout.layout.newGraphManager();
     this.gm = gm;
 
@@ -250,6 +251,8 @@ _SbgnPDLayout.prototype.run = function () {
         var posY = lnode.rect.y;
         var h = lnode.rect.height;
         var dummy_parent_id = null;
+        
+        // TODO: Is it correct?
         if (cyNode.scratch('sbgnPdLayout') && cyNode.scratch('sbgnPdLayout').dummy_parent_id)
             dummy_parent_id = cyNode.scratch('sbgnPdLayout').dummy_parent_id;
 
