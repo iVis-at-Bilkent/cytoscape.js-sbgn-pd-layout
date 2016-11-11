@@ -5,8 +5,8 @@ function SbgnPDEdge(source, target, vEdge)
 {
     CoSEEdge.call(this, source, target, vEdge);
     
-    this.correspondingAngle = 0;     // int
-    this.isProperlyOriented = false; // boolean
+    this.correspondingAngle = 0;
+    this.isProperlyOriented = false;
 }
 
 function SbgnPDEdge(source, target, vEdge, type) 
@@ -25,6 +25,7 @@ for (var prop in CoSEEdge) {
 
 SbgnPDEdge.prototype.copy = function (/*SbgnPDEdge*/ edge) 
 {
+    // TODO: Do we really have access to these two functions?
     this.setSource(edge.getSource());
     this.setTarget(edge.getTarget());
     
