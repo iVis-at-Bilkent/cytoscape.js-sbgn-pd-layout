@@ -2,6 +2,8 @@ var CoSELayout = require('./CoSELayout');
 var HashMap = require('./HashMap');
 var SbgnPDConstants = require('./SbgnPDConstants');
 var IGeometry = require('./IGeometry');
+var PointD = require('./PointD');
+var SbgnPDConstants = require('./SbgnPDConstants');
 
 SbgnPDLayout.prototype.DefaultCompactionAlgorithmEnum = 
 {
@@ -258,7 +260,7 @@ SbgnPDLayout.prototype.rotateAProcess = function ()
         }
         else
         {
-            randomIndex = (Math.random() * processNodesToBeRotated.lenght);
+            randomIndex = (Math.random() * processNodesToBeRotated.length);
         }
 
         var sbgnProcessNode = processNodesToBeRotated[randomIndex];
@@ -403,7 +405,7 @@ SbgnPDLayout.prototype.finalEnhancement = function ()
                     sbgnProcessNode.effectorEdges[i].isProperlyOriented = 
                             bestPropList[i + 
                                 (sbgnProcessNode.consumptionEdges.length + 
-                                    sbgnProcessNode.productEdges.lenght)];
+                                    sbgnProcessNode.productEdges.length)];
             }
         }
     }
@@ -416,6 +418,400 @@ SbgnPDLayout.prototype.finalEnhancement = function ()
     {
         totalEffCount += this.processNodeList[i].effectorEdges.length;
     }
+};
+
+/**
+* If a process node has higher netRotationalForce, it has more chance to be
+* rotated
+*/
+SbgnPDLayout.prototype.rouletteWheelSelection = function (
+               /*ArrayList<SbgnProcessNode>*/ processNodesToBeRotated)
+{
+    var randomNumber = Math.random();
+    var fitnessValues = [] /*processNodesToBeRotated.size()]*/;
+    var totalSum = 0;
+    var sumOfProbabilities = 0;
+    var i = 0;
+
+    var numOfProcessNodesToBeRotated = processNodesToBeRotated.length;
+    for (var j; j<numOfProcessNodesToBeRotated; j++)
+    {
+        totalSum += Math.abs(processNodesToBeRotated[j].netRotationalForce);
+    }
+
+    // normalize all between 0..1
+    var numOfProcessNodesToBeRotated = processNodesToBeRotated.length;
+    for (var j; j<numOfProcessNodesToBeRotated; j++)
+    {
+        fitnessValues[i] = 
+                sumOfProbabilities + 
+                (Math.abs(processNodesToBeRotated[j].netRotationalForce) / 
+                    totalSum);
+
+        sumOfProbabilities = fitnessValues[i];
+        i++;
+    }
+        
+    if (randomNumber < fitnessValues[0])
+    {
+        return 0;
+    }
+    else
+    {
+        for (var j = 0; j < fitnessValues.length - 1; j++)
+        {
+            if ((randomNumber >= fitnessValues[j]) && 
+                (randomNumber < fitnessValues[j+1]))
+            {
+                return j + 1;
+            }
+        }
+    }
+
+    return -1;
+};
+
+SbgnPDLayout.prototype.calcEffectorAngle = function (
+        /*Orientation*/ orient, 
+        /*PointD*/      centerPt,
+        /*CoSENode*/    eff)
+{
+    var idealEdgeLength = this.idealEdgeLength;
+    var targetPnt = new PointD();
+    var centerPnt = centerPt;
+
+    // find target point
+    if (orient === Orientation.LEFT_TO_RIGHT || 
+        orient === Orientation.RIGHT_TO_LEFT)
+    {
+        targetPnt.x = centerPnt.x;
+
+        if (eff.getCenterY() > centerPnt.y)
+        {
+            targetPnt.y = centerPnt.y + idealEdgeLength;
+        }
+        else
+        {
+            targetPnt.y = centerPnt.y - idealEdgeLength;
+        }
+    }
+    else if (orient === Orientation.BOTTOM_TO_TOP || 
+             orient === Orientation.TOP_TO_BOTTOM)
+    {
+        targetPnt.y = centerPnt.y;
+
+        if (eff.getCenterX() > centerPnt.x)
+        {
+            targetPnt.x = centerPnt.x + idealEdgeLength;
+        }
+        else
+        {
+            targetPnt.x = centerPnt.x - idealEdgeLength;
+        }
+    }
+
+    var angle = IGeometry.calculateAngle(targetPnt, centerPnt, eff.getCenter());
+
+    return angle;
+};
+
+/**
+* Recursively calculate if the node or its child nodes have any edges to
+* other nodes. Return the total number of edges.
+*/
+SbgnPDLayout.prototype.calcGraphDegree = function (/*SbgnPDNode*/ parentNode)
+{
+    var degree = 0;
+    if (parentNode.getChild() == null)
+    {
+        degree = parentNode.getEdges().size();
+        return degree;
+    }
+
+    var numOfChildren = parentNode.getChild().getNodes().length;
+    for (var i=0; i<numOfChildren; i++)
+    {
+        degree = degree + parentNode.getEdges().length
+                        + calcGraphDegree(parentNode.getChild().getNodes()[i]);
+    }
+    
+    return degree;
+};
+
+SbgnPDLayout.prototype.recalcProperlyOrientedEdges = function (/*boolean*/ isLastIteration)
+{
+    this.properlyOrientedEdgeCount = 0.0;
+    this.totalEdgeCountToBeOriented = 0;
+    
+    var numOfProcessNodes = this.processNodeList.length;
+    for(var i=0; i<numOfProcessNodes; i++)
+    {
+        var sbgnProcessNode = this.processNodeList[i];
+        
+        sbgnProcessNode.calcProperlyOrientedEdges();
+        this.properlyOrientedEdgeCount += sbgnProcessNode.properEdgeCount;
+        this.totalEdgeCountToBeOriented += 
+                (sbgnProcessNode.consumptionEdges.length + 
+                 sbgnProcessNode.productEdges.length + 
+                 sbgnProcessNode.effectorEdges.length);
+        this.successRatio = 
+                this.properlyOrientedEdgeCount / this.totalEdgeCountToBeOriented;
+    }
+};
+
+/**
+* This method finds all the zero degree nodes in the graph which are not
+* owned by a complex node. Zero degree nodes at each level are grouped
+* together and placed inside a dummy complex to reduce bounds of root
+* graph.
+*/
+SbgnPDLayout.prototype.groupZeroDegreeMembers = function ()
+{
+    var childComplexMap = new HashMap();/*SbgnPDNode, LGraph*/
+    
+    var numOfGraphs = this.getGraphManager().getGraphs().length;
+    for (var i=0; i<numOfGraphs; i++)
+    {
+        var ownerGraph = this.getGraphManager().getGraphs()[i];
+        var zeroDegreeNodes = []; /*ArrayList<SbgnPDNode>*/
+        
+        // do not process complex nodes (their members are already owned)
+        if ((ownerGraph.getParent().type != null) && 
+            (ownerGraph.getParent().isComplex()))
+        {
+            continue;
+        }
+        
+        var numOfNodes = ownerGraph.getNodes().length;
+        for (var j=0; j<numOfNodes; j++)
+        {
+            var node = ownerGraph.getNodes()[j];
+
+            if (calcGraphDegree(node) == 0)
+            {
+                zeroDegreeNodes.push(node);
+            }
+        }
+
+        if (zeroDegreeNodes.length > 1)
+        {
+            // create a new dummy complex
+            var complex = this.newNode(null);
+            complex.type = SbgnPDConstants.COMPLEX;
+            complex.label = "DummyComplex_" + ownerGraph.getParent().label;
+
+            ownerGraph.add(complex);
+
+            var childGraph = newGraph(null);
+            
+            var numOfZeroDegreeNode = zeroDegreeNodes.length;
+            for (var j=0; j<numOfZeroDegreeNode; j++)
+            {
+                var zeroNode = zeroDegreeNodes[j];
+                ownerGraph.remove(zeroNode);
+                childGraph.add(zeroNode);
+            }
+            
+            this.dummyComplexList.push(complex);
+            childComplexMap.put(complex, childGraph);
+        }
+    }
+    
+    var numOfComplexNodes = this.dummyComplexList.length;
+    for (var i=0; i<numOfComplexNodes; i++)
+    {
+        this.graphManager.add(childComplexMap.get(complex), this.dummyComplexList[i]);
+    }
+    
+    this.getGraphManager().updateBounds();
+
+    this.graphManager.resetAllNodes();
+    this.graphManager.resetAllNodesToApplyGravitation();
+    this.graphManager.resetAllEdges();
+    this.calculateNodesToApplyGravitationTo();
+};
+
+/**
+* This method creates two port nodes and a compound for each process nodes
+* and adds them to graph.
+*/
+SbgnPDLayout.prototype.createPortNodes = function ()
+{
+    var numOfNodes = this.getAllNodes().length;
+    for (var i=0; i<numOfNodes; i++)
+    {
+        var originalProcessNode = this.getAllNodes()[i];
+
+        if (originalProcessNode.type === SbgnPDConstants.PROCESS)
+        {
+            var ownerGraph = originalProcessNode.getOwner();
+
+            // create new nodes and graphs
+            var processNode = newProcessNode(null);
+            var inputPort   = newPortNode(null, SbgnPDConstants.INPUT_PORT);
+            var outputPort  = newPortNode(null, SbgnPDConstants.OUTPUT_PORT);
+
+            // create a dummy compound
+            var compoundNode = newNode(null);
+            compoundNode.type = SbgnPDConstants.DUMMY_COMPOUND;
+
+            // add labels
+            compoundNode.label = "DummyCompound_" + originalProcessNode.label;
+            inputPort.label = "InputPort_" + originalProcessNode.label;
+            outputPort.label = "OutputPort_" + originalProcessNode.label;
+
+            // create child graph (= 2port+process) to be set as child to
+            // dummy compound
+            var childGraph = newGraph(null);
+            ownerGraph.add(processNode);
+
+            // convert the process node to SbgnProcessNode
+            processNode.copyFromSBGNPDNode(originalProcessNode,
+                            this.getGraphManager());
+
+            processNode.connectNodes(compoundNode, inputPort, outputPort);
+
+            // create rigid edges, change edge connections
+            processNode.reconnectEdges(idealEdgeLength);
+
+            var rigidToProduction = newRigidEdge(null);
+            rigidToProduction.label = ""
+                            + (this.graphManager.getAllEdges().length + 1);
+
+            var rigidToConsumption = newRigidEdge(null);
+            rigidToConsumption.label = ""
+                            + (this.graphManager.getAllEdges().length + 2);
+
+            ownerGraph.remove(processNode);
+
+            // organize child graph
+            childGraph.add(processNode);
+            childGraph.add(inputPort);
+            childGraph.add(outputPort);
+            childGraph.add(rigidToProduction, inputPort, processNode);
+            childGraph.add(rigidToConsumption, outputPort, processNode);
+
+            // organize the compound node
+            compoundNode.setOwner(ownerGraph);
+            compoundNode.setCenter(processNode.getCenterX(),
+                            processNode.getCenterY());
+            ownerGraph.add(compoundNode);
+            this.graphManager.add(childGraph, compoundNode);
+
+            // remove the original process node
+            ownerGraph.remove(originalProcessNode);
+
+            this.processNodeList.push(processNode);
+            this.graphManager.updateBounds();
+        }
+    }
+
+    // reset the topology
+    this.graphManager.resetAllNodes();
+    this.graphManager.resetAllNodesToApplyGravitation();
+    this.graphManager.resetAllEdges();
+
+    this.calculateNodesToApplyGravitationTo();
+};
+
+/**
+* This method checks whether there exists any process nodes in the graph.
+* If there exist any process nodes it is assumed that the given graph
+* respects our structure.
+* 
+* Most likely: this method does not work properly. Never had any input to
+* test. Not complete.
+*/
+SbgnPDLayout.prototype.arePortNodesCreated = function ()
+{
+    var flag = false;
+
+    // if there are any process nodes, check for port nodes
+    var numOfNodes = this.getAllNodes().length;
+    for (var i=0; i<numOfNodes; i++)
+    {
+        var sbgnPDNode = this.getAllNodes()[i];
+        
+        if (sbgnPDNode.type === SbgnPDConstants.PROCESS)
+        {
+            flag = true;
+            break;
+        }
+    }
+    
+    // if there are no process nodes, no need to check for port nodes
+    if (!flag)
+    {
+        return true;
+    }
+    else
+    {
+        // check for the port nodes. if any found, return true.
+        var numOfNodes = this.getAllNodes().length;
+        for (var i=0; i<numOfNodes; i++)
+        {
+            var sbgnPDNode = this.getAllNodes()[i];
+            
+            if (sbgnPDNode.type === SbgnPDConstants.INPUT_PORT || 
+                sbgnPDNode.type === SbgnPDConstants.OUTPUT_PORT)
+            {
+                return true;
+            }
+        }
+    }
+    
+    return false;
+};
+
+/**
+* This method is used to remove the dummy compounds (previously created for
+* each process node) from the graph.
+*/
+SbgnPDLayout.prototype.removeDummyCompounds = function ()
+{
+    var numOfProcessNodes = this.processNodeList.length;
+    for (var i=0; i<numOfProcessNodes; i++)
+    {
+        var processNode = this.processNodeList[i];
+        var dummyNode = processNode.parentCompound;
+        var childGraph = dummyNode.getChild();
+        var owner = dummyNode.getOwner();
+
+        // add children to original parent
+        var numOfChildNodes = childGraph.getNodes().length;
+        for (var j=0; j<numOfChildNodes; j++)
+        {
+            owner.add(childGraph.getNodes()[j]);
+        }
+
+        var numOfChildEdges = childGraph.getEdges().length;
+        for (var j=0; j<numOfChildEdges; j++)
+        {
+            var edge = childGraph.getEdges()[j]
+            owner.add(edge, edge.getSource(), edge.getTarget());
+        }
+        
+        // add effectors / remaining edges back to the process
+        for (var j = 0; j < dummyNode.getEdges().length; j++)
+        {
+            var edge = dummyNode.getEdges()[j];
+
+            dummyNode.getEdges().splice(j, 1);
+            edge.setTarget(processNode);
+            processNode.getEdges().push(edge);
+            j--;
+        }
+
+        // remove the graph
+        this.getGraphManager().getGraphs().splice(this.getGraphManager().getGraphs().indexOf(childGraph), 1);
+        dummyNode.setChild(null);
+        owner.remove(dummyNode);
+    }
+
+    this.getGraphManager().resetAllNodes();
+    this.getGraphManager().resetAllNodesToApplyGravitation();
+    this.getGraphManager().resetAllEdges();
+    this.calculateNodesToApplyGravitationTo();
 };
 
 module.exports = SbgnPDLayout;
