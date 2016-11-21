@@ -39,6 +39,8 @@ var SbgnPDNode = require('./SbgnPDNode');
 var SbgnProcessNode = require('./SbgnProcessNode');
 var VisibilityEdge = require('./VisibilityEdge');
 var VisibilityGraph = require('./VisibilityGraph');
+var MemberPack = require('./MemberPack');
+var Organization = require('./Organization');
 
 _SbgnPDLayout.idToLNode = {};
 _SbgnPDLayout.toBeTiled = {};
@@ -218,6 +220,8 @@ _SbgnPDLayout.prototype.run = function () {
         t1.require(SbgnProcessNode, 'SbgnProcessNode');
         t1.require(VisibilityEdge, 'VisibilityEdge');
         t1.require(VisibilityGraph, 'VisibilityGraph');
+        t1.require(MemberPack, 'MemberPack');
+        t1.require(Organization, 'Organization');
     }
 
     var nodes = this.options.eles.nodes();

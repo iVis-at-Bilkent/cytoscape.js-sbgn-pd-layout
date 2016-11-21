@@ -4,6 +4,7 @@ var SbgnPDConstants = require('./SbgnPDConstants');
 var IGeometry = require('./IGeometry');
 var PointD = require('./PointD');
 var SbgnPDConstants = require('./SbgnPDConstants');
+var MemberPack = require('./MemberPack');
 
 SbgnPDLayout.prototype.DefaultCompactionAlgorithmEnum = 
 {
@@ -812,6 +813,75 @@ SbgnPDLayout.prototype.removeDummyCompounds = function ()
     this.getGraphManager().resetAllNodesToApplyGravitation();
     this.getGraphManager().resetAllEdges();
     this.calculateNodesToApplyGravitationTo();
+};
+
+
+// ********************* SECTION : TILING METHODS *********************
+
+SbgnPDLayout.prototype.clearComplex = function (/*SbgnPDNode*/ comp)
+{
+    var pack = null; /* MemberPack */
+    var childGr = comp.getChild(); /* LGraph */
+    this.childGraphMap.put(comp, childGr);
+
+    if (childGr == null)
+    {
+        return;
+    }
+    
+    if (this.compactionMethod == this.DefaultCompactionAlgorithmEnum.POLYOMINO_PACKING)
+    {
+        this.applyPolyomino(comp);
+    }
+    else if (this.compactionMethod == this.DefaultCompactionAlgorithmEnum.TILING)
+    {
+        pack = new MemberPack(childGr);
+        this.memberPackMap.put(comp, pack);
+    }
+
+    if (this.dummyComplexList.includes(comp))
+    {
+        for (var i=0; i<comp.getChild().getNodes().length; i++)
+        {
+            clearDummyComplexGraphs(comp.getChild().getNodes()[i]);
+        }
+    }
+
+    var remIndex = this.getGraphManager().getGraphs().indexOf(childGr);
+    this.getGraphManager().getGraphs().splice(remIndex, 1);
+    comp.setChild(null);
+
+    if (this.compactionMethod == this.DefaultCompactionAlgorithmEnum.TILING)
+    {
+        comp.setWidth(pack.getWidth());
+        comp.setHeight(pack.getHeight());
+    }
+
+    // Redirect the edges of complex members to the complex.
+    if (childGr != null)
+    {
+        for (var i=0; i<childGr.getNodes().length; i++)
+        {
+            var chNd = childGr.getNodes()[i];
+
+            for (var j=0; j<chNd.getEdges().length; j++)
+            {
+                var edge = chNd.getEdges()[j];
+                if (edge.getSource() == chNd)
+                {
+                    chNd.getEdges().splice(chNd.getEdges().indexOf(edge), 1);
+                    edge.setSource(comp);
+                    comp.getEdges().push(edge);
+                }
+                else if (edge.getTarget() == chNd)
+                {
+                    chNd.getEdges().remove(edge);
+                    edge.setTarget(comp);
+                    comp.getEdges().add(edge);
+                }
+            }
+        }
+    }
 };
 
 module.exports = SbgnPDLayout;
