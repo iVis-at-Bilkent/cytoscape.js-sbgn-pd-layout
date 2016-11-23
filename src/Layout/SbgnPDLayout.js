@@ -875,13 +875,119 @@ SbgnPDLayout.prototype.clearComplex = function (/*SbgnPDNode*/ comp)
                 }
                 else if (edge.getTarget() == chNd)
                 {
-                    chNd.getEdges().remove(edge);
+                    chNd.getEdges().splice(chNd.getEdges().indexOf(edge), 1);
                     edge.setTarget(comp);
-                    comp.getEdges().add(edge);
+                    comp.getEdges().push(edge);
                 }
             }
         }
     }
 };
+
+/**
+* This method searched unmarked complex nodes recursively, because they may
+* contain complex children. After the order is found, child graphs of each
+* complex node are cleared.
+*/
+SbgnPDLayout.prototype.applyDFSOnComplexes = function ()
+{
+       // LGraph>();
+       var numOfNodes = this.getAllNodes().length;
+       for (var i = 0; i < numOfNodes; i++)
+       {
+            var node = this.getAllNodes()[i];
+           
+            // TODO: Instance of!
+            if (node.isComplex())
+            {
+                continue;
+            }
+            // complex is found, recurse on it until no visited complex remains.
+            if (!node.visited)
+            {
+                this.DFSVisitComplex(node);
+            }
+       }
+
+       // clear each complex
+       var numOfComplexOrder = this.complexOrder.length;
+       for (var i = 0; i < numOfComplexOrder; i++)
+       {
+           clearComplex(this.complexOrder[i]);
+       }
+
+       this.getGraphManager().updateBounds();
+
+       this.getGraphManager().resetAllNodes();
+       this.getGraphManager().resetAllNodesToApplyGravitation();
+       this.getGraphManager().resetAllEdges();
+};
+
+/**
+* This method recurses on the complex objects. If a node does not contain
+* any complex nodes or all the nodes in the child graph is already marked,
+* it is reported. (Depth first)
+* 
+*/
+SbgnPDLayout.prototype.DFSVisitComplex = function (/*SbgnPDNode*/ node)
+{
+    if (node.getChild() != null)
+    {
+         var numOfChildren =  node.getChild().getNodes().length;
+         for (var i = 0; i < numOfChildren; i++)
+         {
+             this.DFSVisitComplex(node.getChild().getNodes()[i]);
+         }
+    }
+
+    if (node.isComplex() && !node.containsUnmarkedComplex())
+    {
+         this.complexOrder.push(node);
+         node.visited = true;
+         return;
+    }
+};
+
+/**
+* This method tiles the given list of nodes by using polyomino packing
+* algorithm.
+*/
+SbgnPDLayout.prototype.applyPolyomino = function (/*SbgnPDNode*/ parent)
+{
+    var rect;
+    var childGr = parent.getChild();
+
+    if (childGr == null)
+    {
+        console.log("Child graph is empty (Polyomino)");
+    }
+    else
+    {
+        // packing takes the input as an array. put the members in an array.
+        var mpArray = [];
+        for (var i = 0; i < childGr.getNodes().length; i++)
+        {
+            mpArray[i] = childGr.getNodes()[i];
+        }
+
+        // pack rectangles
+        RectProc.packRectanglesMino(
+                        SbgnPDConstants.COMPLEX_MEM_HORIZONTAL_BUFFER,
+                        mpArray.length, mpArray);
+
+        // apply compaction
+        Compaction c = new Compaction(
+                        (ArrayList<SbgnPDNode>) childGr.getNodes());
+        c.perform();
+
+        // get the resulting rectangle and set parent's (complex) width &
+        // height
+        r = calculateBounds(true,
+                        (ArrayList<SbgnPDNode>) childGr.getNodes());
+
+        parent.setWidth(r.getWidth());
+        parent.setHeight(r.getHeight());
+    }
+}|
 
 module.exports = SbgnPDLayout;
