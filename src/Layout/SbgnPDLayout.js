@@ -5,6 +5,8 @@ var IGeometry = require('./IGeometry');
 var PointD = require('./PointD');
 var SbgnPDConstants = require('./SbgnPDConstants');
 var MemberPack = require('./MemberPack');
+var RectProc = require('./RectProc');
+var Compaction = require('./Compaction');
 
 SbgnPDLayout.prototype.DefaultCompactionAlgorithmEnum = 
 {
@@ -973,21 +975,20 @@ SbgnPDLayout.prototype.applyPolyomino = function (/*SbgnPDNode*/ parent)
         // pack rectangles
         RectProc.packRectanglesMino(
                         SbgnPDConstants.COMPLEX_MEM_HORIZONTAL_BUFFER,
-                        mpArray.length, mpArray);
+                        mpArray.length, 
+                        mpArray);
 
         // apply compaction
-        Compaction c = new Compaction(
-                        (ArrayList<SbgnPDNode>) childGr.getNodes());
+        var c = new Compaction(childGr.getNodes());
         c.perform();
 
         // get the resulting rectangle and set parent's (complex) width &
         // height
-        r = calculateBounds(true,
-                        (ArrayList<SbgnPDNode>) childGr.getNodes());
+        rect = this.calculateBounds(true, childGr.getNodes());
 
-        parent.setWidth(r.getWidth());
-        parent.setHeight(r.getHeight());
+        parent.setWidth(rect.getWidth());
+        parent.setHeight(rect.getHeight());
     }
-}|
+};
 
 module.exports = SbgnPDLayout;

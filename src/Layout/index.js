@@ -41,6 +41,9 @@ var VisibilityEdge = require('./VisibilityEdge');
 var VisibilityGraph = require('./VisibilityGraph');
 var MemberPack = require('./MemberPack');
 var Organization = require('./Organization');
+var PolyominoQuickSort = require('./PolyominoQuickSort');
+var PolyominoPacking = require('./PolyominoPacking');
+var RectProc = require('./RectProc');
 
 _SbgnPDLayout.idToLNode = {};
 _SbgnPDLayout.toBeTiled = {};
@@ -222,6 +225,9 @@ _SbgnPDLayout.prototype.run = function () {
         t1.require(VisibilityGraph, 'VisibilityGraph');
         t1.require(MemberPack, 'MemberPack');
         t1.require(Organization, 'Organization');
+        t1.require(PolyominoQuickSort, 'PolyominoQuickSort');
+        t1.require(PolyominoPacking, 'PolyominoPacking');
+        t1.require(RectProc, 'RectProc');
     }
 
     var nodes = this.options.eles.nodes();

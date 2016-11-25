@@ -1,9 +1,11 @@
 var RandomSeed = require('./RandomSeed');
-
-RectProc.AspectRatio = (1.0 / 1.0);// ysize/xsize
+var Polyomino = require('./Polyomino');
+var Point = require('./Point');
 
 function RectProc() {
 }
+
+RectProc.AspectRatio = (1.0 / 1.0);// ysize/xsize
 
 RectProc.PlaceRandomly = function (rN, rX1, rY1, rL, rH)
 {
@@ -116,40 +118,41 @@ RectProc.packRectanglesMino = function (buffer, rN, rX, rW, rY, rH, rectangles)
     stepX *= fstep;
 
     // make the polyomino representation
-    Polyomino[] minos = new Polyomino[rN];
+    var minos = [];
 
-    for (int i = 0; i < rN; i++)
+    for (var i = 0; i < rN; i++)
     {
-            // size of the rectangle in grid units
-            int W = (int) Math.ceil((rW[i] + buffer) / stepX);
-            int H = (int) Math.ceil((rH[i] + buffer) / stepY);
+        // size of the rectangle in grid units
+        var W = Math.ceil((rW[i] + buffer) / stepX);
+        var H = Math.ceil((rH[i] + buffer) / stepY);
 
-            minos[i] = new Polyomino();
-            minos[i].coord = new Point[W * H];
+        minos[i] = new Polyomino();
+        minos[i].coord = [];
 
-            // create the polyomino cells
-            int cnt = 0;
-            for (int y = 0; y < H; y++)
-                    for (int x = 0; x < W; x++)
-                    {
-                            minos[i].coord[cnt] = new Point();
-                            minos[i].coord[cnt].x = x;
-                            minos[i].coord[cnt++].y = y;
-
-                    }
-            minos[i].l = cnt;
-            minos[i].label = rectangles[i].label;
+        // create the polyomino cells
+        var cnt = 0;
+        for (var y = 0; y < H; y++)
+        {
+            for (var x = 0; x < W; x++)
+            {
+                minos[i].coord[cnt] = new Point();
+                minos[i].coord[cnt].x = x;
+                minos[i].coord[cnt++].y = y;
+            }
+        }
+        minos[i].l = cnt;
+        minos[i].label = rectangles[i].label;
     }
 
     // do the packing
-    PolyominoPacking packer = new PolyominoPacking();
+    var packer = new PolyominoPacking();
     packer.pack(minos, rN);
 
     // get the results
-    for (int i = 0; i < rN; i++)
+    for (var i = 0; i < rN; i++)
     {
-            rX[i] = minos[i].x * stepX;
-            rY[i] = minos[i].y * stepY;
+        rX[i] = minos[i].x * stepX;
+        rY[i] = minos[i].y * stepY;
     }
 };
 
