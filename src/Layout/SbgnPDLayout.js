@@ -7,6 +7,8 @@ var SbgnPDConstants = require('./SbgnPDConstants');
 var MemberPack = require('./MemberPack');
 var RectProc = require('./RectProc');
 var Compaction = require('./Compaction');
+var Integer = require('./Integer');
+var RectangleD = require('./RectangleD');
 
 SbgnPDLayout.prototype.DefaultCompactionAlgorithmEnum = 
 {
@@ -990,5 +992,274 @@ SbgnPDLayout.prototype.applyPolyomino = function (/*SbgnPDNode*/ parent)
         parent.setHeight(rect.getHeight());
     }
 };
+
+/**
+* Reassigns the complex content. The outermost complex is placed first.
+*/
+SbgnPDLayout.prototype.repopulateComplexes = function ()
+{
+    var emptiedDummyComplexMapSize = this.emptiedDummyComplexMap.keySet().length;
+    for (var i = 0; i < emptiedDummyComplexMapSize; i++)
+    {
+        var comp = this.emptiedDummyComplexMap.keySet()[i];
+        var chGr = this.emptiedDummyComplexMap.get(comp);
+        comp.setChild(chGr);
+        this.getGraphManager().getGraphs().push(chGr);
+    }
+
+    for (var i = this.complexOrder.length - 1; i >= 0; i--)
+    {
+        var comp = this.complexOrder[i];
+        var chGr = this.childGraphMap.get(comp);
+
+        // repopulate the complex
+        comp.setChild(chGr);
+
+        // if the child graph is not null, adjust the positions of members
+        if (chGr != null)
+        {
+            // adjust the positions of the members
+            if (this.compactionMethod === this.DefaultCompactionAlgorithmEnum.POLYOMINO_PACKING)
+            {
+                this.adjustLocation(comp, chGr);
+                this.getGraphManager().getGraphs().push(chGr);
+            }
+            else if (compactionMethod === this.DefaultCompactionAlgorithmEnum.TILING)
+            {
+                this.getGraphManager().getGraphs().push(chGr);
+
+                var pack = this.memberPackMap.get(comp);
+                pack.adjustLocations(comp.getLeft(), comp.getTop());
+            }
+        }
+    }
+    
+    var emptiedDummyComplexMapSize = this.emptiedDummyComplexMap.keySet().length;
+    for (var i = 0; i < emptiedDummyComplexMapSize; i++)
+    {
+        var comp = this.emptiedDummyComplexMap.keySet()[i];
+        var chGr = this.emptiedDummyComplexMap.get(comp);
+
+        this.adjustLocation(comp, chGr);
+    }
+
+    this.removeDummyComplexes();
+
+    // reset
+    this.getGraphManager().resetAllNodes();
+    this.getGraphManager().resetAllNodesToApplyGravitation();
+    this.getGraphManager().resetAllEdges();
+    this.calculateNodesToApplyGravitationTo();
+};
+
+/**
+* Adjust locations of children of given complex wrt. the location of the
+* complex
+*/
+SbgnPDLayout.prototype.adjustLocation = function (comp, chGr)
+{
+    var rect = calculateBounds(false, chGr.getNodes());
+
+    var differenceX = (rect.x - comp.getLeft());
+    var differenceY = (rect.y - comp.getTop());
+
+    // if the parent graph is a compound, add compound margins
+    if (comp.type !== SbgnPDConstants.COMPLEX)
+    {
+        differenceX -= SbgnPDConstants.COMPOUND_NODE_MARGIN;
+        differenceY -= SbgnPDConstants.COMPOUND_NODE_MARGIN;
+    }
+
+    for (var j = 0; j < chGr.getNodes().length; j++)
+    {
+        var s = chGr.getNodes[j];
+
+        s.setLocation(s.getLeft() - differenceX
+                        + SbgnPDConstants.COMPLEX_MEM_HORIZONTAL_BUFFER, s.getTop()
+                        - differenceY + SbgnPDConstants.COMPLEX_MEM_VERTICAL_BUFFER);
+
+        if (s.getChild() !== null)
+        {
+            this.adjustLocation(s, s.getChild());
+        }
+    }
+};
+
+/**
+* Recursively removes all dummy complex nodes (previously created to tile
+* group degree-zero nodes) from the graph.
+*/
+SbgnPDLayout.prototype.clearDummyComplexGraphs = function (comp)
+{
+    if (comp.getChild() == null || comp.isDummyCompound)
+    {
+        return;
+    }
+    
+    var numOfChildren = comp.getChild().getNodes().length;
+    for (var i = 0; i < numOfChildren; i++)
+    {
+        var childNode = comp.getChild().getNodes()[i];
+        if (childNode.getChild() != null && childNode.getEdges().length == 0)
+        {
+            this.clearDummyComplexGraphs(childNode);
+        }
+    }
+    if (this.graphManager.getGraphs().includes(comp.getChild()))
+    {
+        if (this.calcGraphDegree(comp) === 0)
+        {
+            this.emptiedDummyComplexMap.put(comp, comp.getChild());
+
+            this.getGraphManager().getGraphs().splice(
+                    this.getGraphManager().getGraphs().indexOf(comp.getChild()), 1);
+            comp.setChild(null);
+        }
+    }
+};
+
+/**
+* Dummy complexes (placed in the "dummyComplexList") are removed from the
+* graph.
+*/
+SbgnPDLayout.prototype.removeDummyComplexes = function ()
+{
+    var dummyComplexListSize = this.dummyComplexList.length;
+    // remove dummy complexes and connect children to original parent
+    for (var i=0; i<dummyComplexListSize; i++)
+    {
+        var dummyComplex = this.dummyComplexList[i];
+        var childGraph = dummyComplex.getChild();
+        var owner = dummyComplex.getOwner();
+
+        this.getGraphManager().getGraphs().splice(
+                this.getGraphManager().getGraphs().indexOf(childGraph), 1);
+        dummyComplex.setChild(null);
+
+        owner.remove(dummyComplex);
+
+        var numOfChildren = childGraph.getNodes().length;
+        for (var j=0; j<numOfChildren; j++)
+        {
+            owner.add(childGraph.getNodes()[j]);
+        }
+    }
+};
+
+/**
+* This method returns the bounding rectangle of the given set of nodes with
+* or without the margins
+*/
+SbgnPDLayout.prototype.calculateBounds = function (isMarginIncluded, nodes)
+{
+    var boundLeft = Integer.MAX_VALUE;
+    var boundRight = Integer.MIN_VALUE;
+    var boundTop = Integer.MAX_VALUE;
+    var boundBottom = Integer.MIN_VALUE;
+    var nodeLeft;
+    var nodeRight;
+    var nodeTop;
+    var nodeBottom;
+    
+    var numOfChildren = nodes.length;
+    for (var i=0; i<numOfChildren; i++)
+    {
+        var lNode = nodes[i];
+        nodeLeft = lNode.getLeft();
+        nodeRight = lNode.getRight();
+        nodeTop = lNode.getTop();
+        nodeBottom = lNode.getBottom();
+
+        if (boundLeft > nodeLeft)
+            boundLeft = nodeLeft;
+
+        if (boundRight < nodeRight)
+            boundRight = nodeRight;
+
+        if (boundTop > nodeTop)
+            boundTop = nodeTop;
+
+        if (boundBottom < nodeBottom)
+            boundBottom = nodeBottom;
+    }
+
+    if (isMarginIncluded)
+    {
+        return new RectangleD(boundLeft - SbgnPDConstants.COMPLEX_MEM_MARGIN, 
+                              boundTop - SbgnPDConstants.COMPLEX_MEM_MARGIN, 
+                              boundRight - boundLeft + 2 * SbgnPDConstants.COMPLEX_MEM_MARGIN,
+                              boundBottom - boundTop + 2 * SbgnPDConstants.COMPLEX_MEM_MARGIN);
+    }
+    else
+    {
+        return new RectangleD(boundLeft, 
+                              boundTop, 
+                              boundRight - boundLeft, 
+                              boundBottom - boundTop);
+    }
+};
+
+/**
+* calculates usedArea/totalArea inside the complexes and prints them out.
+*/
+SbgnPDLayout.prototype.calculateFullnessOfComplexes = function ()
+{
+    var largestComplex = null;
+    var totalArea = 0.0;
+    var usedArea = 0.0;
+    var maxArea = Number.MIN_VALUE;
+
+    // find the largest complex -> area
+    for (var i = 0; i < this.getAllNodes().length; i++)
+    {
+        var s = this.getAllNodes()[i];
+        if ((s.type === SbgnPDConstants.COMPLEX) && 
+            ((s.getWidth() * s.getHeight()) > maxArea))
+        {
+            maxArea = s.getWidth() * s.getHeight();
+            largestComplex = s;
+        }
+    }
+
+    usedArea = this.calculateUsedArea(largestComplex);
+    totalArea = largestComplex.getWidth() * largestComplex.getHeight();
+
+    if (this.compactionMethod === this.DefaultCompactionAlgorithmEnum.TILING)
+            console.log("Tiling results");
+    else if (this.compactionMethod === this.DefaultCompactionAlgorithmEnum.POLYOMINO_PACKING)
+            console.log("Polyomino Packing results");
+
+    console.log(" = " + usedArea / totalArea);
+};
+
+/**
+* This method calculates the used area of a given complex node's children
+*/
+SbgnPDLayout.prototype.calculateUsedArea = function (parent)
+{
+    var totalArea = 0;
+    if (parent.getChild() == null)
+    {
+        return 0.0;
+    }
+
+    for (var i = 0; i < parent.getChild().getNodes().length; i++)
+    {
+        var node = parent.getChild().getNodes()[i];
+
+        if (node.type !== SbgnPDConstants.COMPLEX)
+        {
+            totalArea += node.getWidth() * node.getHeight();
+        }
+        else
+        {
+            totalArea += this.calculateUsedArea(node);
+        }
+    }
+    
+    return totalArea;
+};
+
+
 
 module.exports = SbgnPDLayout;
