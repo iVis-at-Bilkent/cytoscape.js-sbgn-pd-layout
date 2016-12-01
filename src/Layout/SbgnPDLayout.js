@@ -1,14 +1,20 @@
-var CoSELayout = require('./CoSELayout');
-var HashMap = require('./HashMap');
-var SbgnPDConstants = require('./SbgnPDConstants');
+var Integer = require('./Integer');
 var IGeometry = require('./IGeometry');
 var PointD = require('./PointD');
+var RectangleD = require('./RectangleD');
+
+var HashMap = require('./HashMap');
+var HashSet = require('./HashSet');
+
+var CoSELayout = require('./CoSELayout');
+var SbgnPDNode = require('./SbgnPDNode');
+var SbgnPDEdge = require('./SbgnPDEdge');
+var SbgnProcessNode = require('./SbgnProcessNode');
 var SbgnPDConstants = require('./SbgnPDConstants');
+
 var MemberPack = require('./MemberPack');
 var RectProc = require('./RectProc');
 var Compaction = require('./Compaction');
-var Integer = require('./Integer');
-var RectangleD = require('./RectangleD');
 
 SbgnPDLayout.prototype.DefaultCompactionAlgorithmEnum = 
 {
@@ -1260,6 +1266,296 @@ SbgnPDLayout.prototype.calculateUsedArea = function (parent)
     return totalArea;
 };
 
+// ********************* SECTION : OVERRIDEN METHODS *********************
 
+/**
+ * This method creates a new node associated with the input view node.
+ */
+SbgnPDLayout.prototype.newNode = function (vNode)
+{
+    return new SbgnPDNode(this.graphManager, null, null, vNode, null);
+};
+
+/**
+ * This method creates a new edge associated with the input view edge.
+ */
+SbgnPDLayout.prototype.newEdge = function (vEdge)
+{
+    return new SbgnPDEdge(null, null, vEdge);
+};
+
+/**
+ * This method performs layout on constructed l-level graph. It returns true
+ * on success, false otherwise.
+ */
+SbgnPDLayout.prototype.layout = function ()
+{
+    var b = false;
+
+    this.groupZeroDegreeMembers();
+    this.applyDFSOnComplexes();
+    b = CoSELayout.prototype.layout.call(this, arguments);
+    this.repopulateComplexes();
+
+    this.getAllNodes();
+    return b;
+};
+
+/**
+* This method uses classic layout method (without multi-scaling)
+* Modification: create port nodes after random positioning
+*/
+//@Override
+SbgnPDLayout.prototype.classicLayout = function ()
+{
+    this.calculateNodesToApplyGravitationTo();
+
+    this.graphManager.calcLowestCommonAncestors();
+    this.graphManager.calcInclusionTreeDepths();
+
+    this.graphManager.getRoot().calcEstimatedSize();
+    this.calcIdealEdgeLengths();
+
+    if (!this.incremental)
+    {
+        var forest = this.getFlatForest();
+
+        if (forest.length > 0)
+        // The graph associated with this layout is flat and a forest
+        {
+            this.positionNodesRadially(forest);
+        }
+        else
+        // The graph associated with this layout is not flat or a forest
+        {
+            this.positionNodesRandomly();
+        }
+    }
+
+    if (!this.arePortNodesCreated())
+    {
+        this.createPortNodes();
+        this.graphManager.resetAllNodes();
+        this.graphManager.resetAllNodesToApplyGravitation();
+        this.graphManager.resetAllEdges();
+        this.calculateNodesToApplyGravitationTo();
+    }
+    
+    this.initSpringEmbedder();
+    this.runSpringEmbedder();
+
+    return true;
+};
+
+
+/**
+ * This method calculates the spring forces for the ends of each node.
+ * Modification: do not calculate spring force for rigid edges
+ */
+//@Override
+SbgnPDLayout.prototype.calcSpringForces = function ()
+{
+    var lEdges = this.getAllEdges();
+    var edge;
+
+    for (var i = 0; i < lEdges.length; i++)
+    {
+        edge = lEdges[i];
+
+        if (edge.type !== SbgnPDConstants.RIGID_EDGE)
+        {    
+            this.calcSpringForce(edge, edge.idealLength);
+        }
+    }
+};
+
+/**	 
+ * This method calculates the repulsion forces for each pair of nodes.
+ * Modification: Do not calculate repulsion for port & process nodes
+ */
+//@Override
+SbgnPDLayout.prototype.calcRepulsionForces = function ()
+{
+    var i, j;
+    var nodeA, nodeB;
+    var lNodes = this.getAllNodes();
+    var processedNodeSet;
+    
+    if (this.useFRGridVariant)
+    {
+        // grid is a vector matrix that holds CoSENodes.
+        // be sure to convert the Object type to CoSENode.
+        if (this.totalIterations
+                % SbgnPDConstants.GRID_CALCULATION_CHECK_PERIOD == 1)
+        {
+            this.grid = this.calcGrid(this.graphManager.getRoot());
+            
+            // put all nodes to proper grid cells
+            for (i = 0; i < lNodes.length; i++)
+            {
+                nodeA = lNodes[i];
+                this.addNodeToGrid(nodeA, 
+                                   this.grid, 
+                                   this.graphManager.getRoot().getLeft(), 
+                                   this.graphManager.getRoot().getTop());
+            }
+        }
+
+        processedNodeSet = new HashSet();
+
+        // calculate repulsion forces between each nodes and its surrounding
+        for (i = 0; i < lNodes.length; i++)
+        {
+            nodeA = lNodes[i];
+            this.calculateRepulsionForceOfANode(this.grid, nodeA, processedNodeSet);
+            processedNodeSet.add(nodeA);
+        }
+    }
+    else
+    {
+        for (i = 0; i < lNodes.length; i++)
+        {
+            nodeA = lNodes[i];
+
+            for (j = i + 1; j < lNodes.length; j++)
+            {
+                nodeB = lNodes[j];
+
+                // If both nodes are not members of the same graph, skip.
+                if (nodeA.getOwner() !== nodeB.getOwner())
+                {
+                    continue;
+                }
+
+                if (nodeA.type !== null && 
+                    nodeB.type !== null && 
+                    nodeA.getOwner() === nodeB.getOwner() && 
+                    (nodeA.type === SbgnPDConstants.INPUT_PORT || 
+                     nodeA.type === SbgnPDConstants.OUTPUT_PORT || 
+                     nodeB.type === SbgnPDConstants.INPUT_PORT || 
+                     nodeB.type === SbgnPDConstants.OUTPUT_PORT))
+                {
+                    continue;
+                }
+
+                this.calcRepulsionForce(nodeA, nodeB);
+            }
+        }
+    }
+};
+
+/**
+ * This method finds surrounding nodes of nodeA in repulsion range.
+ * And calculates the repulsion forces between nodeA and its surrounding.
+ * During the calculation, ignores the nodes that have already been processed.
+ * Modification: Do not calculate repulsion for port & process nodes
+ */
+// @Override
+SbgnPDLayout.prototype.calculateRepulsionForceOfANode = function (grid, nodeA, processedNodeSet)
+{
+    var i, j;
+
+    if (this.totalIterations % FDLayoutConstants.GRID_CALCULATION_CHECK_PERIOD == 1)
+    {
+        var surrounding = new HashSet();
+        var nodeB;
+
+        for (i = (nodeA.startX - 1); i < (nodeA.finishX + 2); i++)
+        {
+            for (j = (nodeA.startY - 1); j < (nodeA.finishY + 2); j++)
+            {
+                if (!((i < 0) || (j < 0) || (i >= grid.length) || (j >= grid[0].length)))
+                {
+                    var numOfNodes = grid[i][j].length;
+                    for (var k = 0; k < numOfNodes; k++)
+                    {
+                        nodeB = grid[i][j][k];
+
+                        // If both nodes are not members of the same graph,
+                        // or both nodes are the same, skip.
+                        if ((nodeA.getOwner() !== nodeB.getOwner()) || 
+                            (nodeA === nodeB))
+                        {
+                            continue;
+                        }
+
+                        if (nodeA.type !== null && 
+                            nodeB.type !== null && 
+                            nodeA.getOwner() === nodeB.getOwner() && 
+                            (nodeA.type === SbgnPDConstants.INPUT_PORT || 
+                             nodeA.type === SbgnPDConstants.OUTPUT_PORT || 
+                             nodeB.type === SbgnPDConstants.INPUT_PORT || 
+                             nodeB.type === SbgnPDConstants.OUTPUT_PORT))
+                        {
+                            continue;
+                        }
+
+                        // check if the repulsion force between
+                        // nodeA and nodeB has already been calculated
+                        if (!processedNodeSet.contains(nodeB) && !surrounding.contains(nodeB))
+                        {
+                            var distanceX = Math.abs(nodeA.getCenterX()
+                                            - nodeB.getCenterX())
+                                            - ((nodeA.getWidth() / 2) + (nodeB
+                                                            .getWidth() / 2));
+                            var distanceY = Math.abs(nodeA.getCenterY()
+                                            - nodeB.getCenterY())
+                                            - ((nodeA.getHeight() / 2) + (nodeB
+                                                            .getHeight() / 2));
+                                                    
+                            // if the distance between nodeA and nodeB
+                            // is less then calculation range
+                            if ((distanceX <= this.repulsionRange) && 
+                                (distanceY <= this.repulsionRange))
+                            {
+                                // then add nodeB to surrounding of nodeA
+                                surrounding.add(nodeB);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        nodeA.surrounding = surrounding.set;
+    }
+
+    for (i = 0; i < nodeA.surrounding.length; i++)
+    {
+        this.calcRepulsionForce(nodeA, nodeA.surrounding[i]);
+    }
+};
+
+/**
+* This method creates a port node with the associated type (input/output
+* port)
+*/
+SbgnPDLayout.prototype.newPortNode = function (vNode, type)
+{
+    var n = new SbgnPDNode(this.graphManager, null, null, vNode, null);
+    n.type = type;
+    n.setWidth(SbgnPDConstants.PORT_NODE_DEFAULT_WIDTH);
+    n.setHeight(SbgnPDConstants.PORT_NODE_DEFAULT_HEIGHT);
+
+    return n;
+};
+
+/**
+* This method creates an SBGNProcessNode object
+*/
+SbgnPDLayout.prototype.newProcessNode = function (vNode)
+{
+    return new SbgnProcessNode(this.graphManager, null, null, vNode);
+};
+
+/**
+* This method creates a rigid edge.
+*/
+SbgnPDLayout.prototype.newRigidEdge = function (vEdge)
+{
+    var e = new SbgnPDEdge(null, null, vEdge);
+    e.type = SbgnPDConstants.RIGID_EDGE;
+    return e;
+};
 
 module.exports = SbgnPDLayout;
