@@ -16,13 +16,13 @@ var MemberPack = require('./MemberPack');
 var RectProc = require('./RectProc');
 var Compaction = require('./Compaction');
 
-SbgnPDLayout.prototype.DefaultCompactionAlgorithmEnum = 
+SbgnPDLayout.DefaultCompactionAlgorithmEnum = 
 {
     TILING : 0, 
     POLYOMINO_PACKING : 1
 };
 
-SbgnPDLayout.prototype.OrientationEnum = 
+SbgnPDLayout.OrientationEnum = 
 {
     LEFT_TO_RIGHT : 0, 
     RIGHT_TO_LEFT : 1,
@@ -38,7 +38,7 @@ function SbgnPDLayout()
 
     this.enhancedRatio = 0;
     this.totalEffCount = 0;
-    this.compactionMethod = this.DefaultCompactionAlgorithmEnum.TILING;
+    this.compactionMethod = SbgnPDLayout.DefaultCompactionAlgorithmEnum.TILING;
 
     this.childGraphMap = new HashMap();          /*Map<SbgnPDNode, LGraph>*/
     this.complexOrder = [];                      /*List<SbgnPDNode>*/
@@ -46,7 +46,7 @@ function SbgnPDLayout()
     this.emptiedDummyComplexMap = new HashMap(); /*Map<SbgnPDNode, LGraph>*/
     this.processNodeList = [];                   /*List<SbgnProcessNode>*/
     
-    if (this.compactionMethod === this.DefaultCompactionAlgorithmEnum.TILING)
+    if (this.compactionMethod === SbgnPDLayout.DefaultCompactionAlgorithmEnum.TILING)
     {
         this.memberPackMap = new HashMap();      /*Map<SbgnPDNode, MemberPack>*/
     }
@@ -302,10 +302,10 @@ SbgnPDLayout.prototype.finalEnhancement = function ()
     var totalProperEdges = 0.0;
     var angle = 0.0;
 
-    orientationList.push(this.Orientation.LEFT_TO_RIGHT);
-    orientationList.push(this.Orientation.RIGHT_TO_LEFT);
-    orientationList.push(this.Orientation.TOP_TO_BOTTOM);
-    orientationList.push(this.Orientation.BOTTOM_TO_TOP);
+    orientationList.push(SbgnPDLayout.OrientationEnum.LEFT_TO_RIGHT);
+    orientationList.push(SbgnPDLayout.OrientationEnum.RIGHT_TO_LEFT);
+    orientationList.push(SbgnPDLayout.OrientationEnum.TOP_TO_BOTTOM);
+    orientationList.push(SbgnPDLayout.OrientationEnum.BOTTOM_TO_TOP);
     
     var numOfProcessNodes = this.processNodeList.length;
     for (var i; i<numOfProcessNodes; i++)
@@ -492,8 +492,8 @@ SbgnPDLayout.prototype.calcEffectorAngle = function (
     var centerPnt = centerPt;
 
     // find target point
-    if (orient === Orientation.LEFT_TO_RIGHT || 
-        orient === Orientation.RIGHT_TO_LEFT)
+    if (orient === SbgnPDLayout.OrientationEnum.LEFT_TO_RIGHT || 
+        orient === SbgnPDLayout.OrientationEnum.RIGHT_TO_LEFT)
     {
         targetPnt.x = centerPnt.x;
 
@@ -506,8 +506,8 @@ SbgnPDLayout.prototype.calcEffectorAngle = function (
             targetPnt.y = centerPnt.y - idealEdgeLength;
         }
     }
-    else if (orient === Orientation.BOTTOM_TO_TOP || 
-             orient === Orientation.TOP_TO_BOTTOM)
+    else if (orient === SbgnPDLayout.OrientationEnum.BOTTOM_TO_TOP || 
+             orient === SbgnPDLayout.OrientationEnum.TOP_TO_BOTTOM)
     {
         targetPnt.y = centerPnt.y;
 
@@ -535,7 +535,7 @@ SbgnPDLayout.prototype.calcGraphDegree = function (/*SbgnPDNode*/ parentNode)
     var degree = 0;
     if (parentNode.getChild() == null)
     {
-        degree = parentNode.getEdges().size();
+        degree = parentNode.getEdges().length;
         return degree;
     }
 
@@ -543,7 +543,7 @@ SbgnPDLayout.prototype.calcGraphDegree = function (/*SbgnPDNode*/ parentNode)
     for (var i=0; i<numOfChildren; i++)
     {
         degree = degree + parentNode.getEdges().length
-                        + calcGraphDegree(parentNode.getChild().getNodes()[i]);
+                        + this.calcGraphDegree(parentNode.getChild().getNodes()[i]);
     }
     
     return degree;
@@ -587,7 +587,7 @@ SbgnPDLayout.prototype.groupZeroDegreeMembers = function ()
         var zeroDegreeNodes = []; /*ArrayList<SbgnPDNode>*/
         
         // do not process complex nodes (their members are already owned)
-        if ((ownerGraph.getParent().type != null) && 
+        if ((ownerGraph.getParent().type !== null) && 
             (ownerGraph.getParent().isComplex()))
         {
             continue;
@@ -598,7 +598,7 @@ SbgnPDLayout.prototype.groupZeroDegreeMembers = function ()
         {
             var node = ownerGraph.getNodes()[j];
 
-            if (calcGraphDegree(node) == 0)
+            if (this.calcGraphDegree(node) === 0)
             {
                 zeroDegreeNodes.push(node);
             }
@@ -839,11 +839,11 @@ SbgnPDLayout.prototype.clearComplex = function (/*SbgnPDNode*/ comp)
         return;
     }
     
-    if (this.compactionMethod == this.DefaultCompactionAlgorithmEnum.POLYOMINO_PACKING)
+    if (this.compactionMethod == SbgnPDLayout.DefaultCompactionAlgorithmEnum.POLYOMINO_PACKING)
     {
         this.applyPolyomino(comp);
     }
-    else if (this.compactionMethod == this.DefaultCompactionAlgorithmEnum.TILING)
+    else if (this.compactionMethod == SbgnPDLayout.DefaultCompactionAlgorithmEnum.TILING)
     {
         pack = new MemberPack(childGr);
         this.memberPackMap.put(comp, pack);
@@ -861,7 +861,7 @@ SbgnPDLayout.prototype.clearComplex = function (/*SbgnPDNode*/ comp)
     this.getGraphManager().getGraphs().splice(remIndex, 1);
     comp.setChild(null);
 
-    if (this.compactionMethod == this.DefaultCompactionAlgorithmEnum.TILING)
+    if (this.compactionMethod == SbgnPDLayout.DefaultCompactionAlgorithmEnum.TILING)
     {
         comp.setWidth(pack.getWidth());
         comp.setHeight(pack.getHeight());
@@ -1025,12 +1025,12 @@ SbgnPDLayout.prototype.repopulateComplexes = function ()
         if (chGr != null)
         {
             // adjust the positions of the members
-            if (this.compactionMethod === this.DefaultCompactionAlgorithmEnum.POLYOMINO_PACKING)
+            if (this.compactionMethod === SbgnPDLayout.DefaultCompactionAlgorithmEnum.POLYOMINO_PACKING)
             {
                 this.adjustLocation(comp, chGr);
                 this.getGraphManager().getGraphs().push(chGr);
             }
-            else if (compactionMethod === this.DefaultCompactionAlgorithmEnum.TILING)
+            else if (compactionMethod === SbgnPDLayout.DefaultCompactionAlgorithmEnum.TILING)
             {
                 this.getGraphManager().getGraphs().push(chGr);
 
@@ -1230,9 +1230,9 @@ SbgnPDLayout.prototype.calculateFullnessOfComplexes = function ()
     usedArea = this.calculateUsedArea(largestComplex);
     totalArea = largestComplex.getWidth() * largestComplex.getHeight();
 
-    if (this.compactionMethod === this.DefaultCompactionAlgorithmEnum.TILING)
+    if (this.compactionMethod === SbgnPDLayout.DefaultCompactionAlgorithmEnum.TILING)
             console.log("Tiling results");
-    else if (this.compactionMethod === this.DefaultCompactionAlgorithmEnum.POLYOMINO_PACKING)
+    else if (this.compactionMethod === SbgnPDLayout.DefaultCompactionAlgorithmEnum.POLYOMINO_PACKING)
             console.log("Polyomino Packing results");
 
     console.log(" = " + usedArea / totalArea);

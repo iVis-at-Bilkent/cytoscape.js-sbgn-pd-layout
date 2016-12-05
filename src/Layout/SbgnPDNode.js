@@ -10,7 +10,8 @@ function SbgnPDNode(gm, loc, size, vNode, type)
     
     this.type = type;
     this.visited = false;
-    this.label = vNode.label;
+    
+    this.label = vNode ? vNode.label : null;
     this.isDummyCompound = false;
 }
 
