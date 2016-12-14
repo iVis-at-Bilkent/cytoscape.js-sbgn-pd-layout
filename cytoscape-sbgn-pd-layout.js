@@ -159,7 +159,7 @@ CoSELayout.prototype.classicLayout = function () {
   this.initSpringEmbedder();
   this.runSpringEmbedder();
 
-  console.log("Classic CoSE layout finished after " +
+  console.log("Classic SbgnPD layout finished after " +
           this.totalIterations + " iterations");
 
   return true;
@@ -5769,7 +5769,7 @@ SbgnPDLayout.prototype.runSpringEmbedder = function ()
 };
 
 /**
-* At this phase, CoSE is applied for a number of iterations.
+* At this phase, SbgnPD is applied for a number of iterations.
 */
 SbgnPDLayout.prototype.doPhase1 = function ()
 {
@@ -6272,7 +6272,10 @@ SbgnPDLayout.prototype.groupZeroDegreeMembers = function ()
         var ownerGraph = this.getGraphManager().getGraphs()[i];
         var zeroDegreeNodes = []; /*ArrayList<SbgnPDNode>*/
         
+        broadcast({log: ({}).toString.call(ownerGraph.getParent()).match(/\s([a-zA-Z]+)/)[1].toLowerCase()});
         broadcast({log: ({}).toString.call(ownerGraph.getParent().type).match(/\s([a-zA-Z]+)/)[1].toLowerCase()});
+        var isNode = (ownerGraph.getParent() instanceof CoSENode);
+        broadcast({log: isNode.toString()});
         
         // do not process complex nodes (their members are already owned)
         if ((ownerGraph.getParent().type !== null) &&
@@ -9341,12 +9344,12 @@ _SbgnPDLayout.prototype.run = function () {
 
                 if (theChild.width != null
                         && theChild.height != null) {
-                    theNode = parent.add(new CoSENode(gm_t,
+                    theNode = parent.add(new SbgnPDNode(gm_t,
                             new PointD(theChild.x, theChild.y),
                             new DimensionD(parseFloat(theChild.width),
                                     parseFloat(theChild.height))));
                 } else {
-                    theNode = parent.add(new CoSENode(gm_t));
+                    theNode = parent.add(new SbgnPDNode(gm_t));
                 }
                 theNode.id = theChild.id;
                 idToLNode_t[theChild.id] = theNode;
@@ -10089,12 +10092,12 @@ _SbgnPDLayout.prototype.processChildrenList = function (parent, children) {
 
         if (theChild.width() != null
                 && theChild.height() != null) {
-            theNode = parent.add(new CoSENode(_SbgnPDLayout.layout.graphManager,
+            theNode = parent.add(new SbgnPDNode(_SbgnPDLayout.layout.graphManager,
                     new PointD(theChild.position('x'), theChild.position('y')),
                     new DimensionD(parseFloat(theChild.width()),
                             parseFloat(theChild.height()))));
         } else {
-            theNode = parent.add(new CoSENode(this.graphManager));
+            theNode = parent.add(new SbgnPDNode(this.graphManager));
         }
         theNode.id = theChild.data("id");
         _SbgnPDLayout.idToLNode[theChild.data("id")] = theNode;
