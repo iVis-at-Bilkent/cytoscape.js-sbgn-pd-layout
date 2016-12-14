@@ -3383,8 +3383,10 @@ Layout.prototype.newEdge = function (vEdge)
 
 Layout.prototype.runLayout = function ()
 {
+  broadcast({log: "INSIDE-RunLayout"});
+    
   this.isLayoutFinished = false;
-
+  
   this.initParameters();
   var isLayoutSuccessfull;
 
@@ -3404,6 +3406,8 @@ Layout.prototype.runLayout = function ()
       startTime = new Date().getTime()
     }
 
+    broadcast({log: "CALLING-this.layout()"});
+    
     isLayoutSuccessfull = this.layout();
 
     if (!this.isSubLayout)
@@ -6258,6 +6262,8 @@ SbgnPDLayout.prototype.recalcProperlyOrientedEdges = function (/*boolean*/ isLas
 */
 SbgnPDLayout.prototype.groupZeroDegreeMembers = function ()
 {
+    broadcast({log: "INSIDE-SbgnPDLayout.prototype.groupZeroDegreeMembers"});
+    
     var childComplexMap = new HashMap();/*SbgnPDNode, LGraph*/
     
     var numOfGraphs = this.getGraphManager().getGraphs().length;
@@ -6266,8 +6272,11 @@ SbgnPDLayout.prototype.groupZeroDegreeMembers = function ()
         var ownerGraph = this.getGraphManager().getGraphs()[i];
         var zeroDegreeNodes = []; /*ArrayList<SbgnPDNode>*/
         
+        broadcast({log: ({}).toString.call(ownerGraph.getParent().type).match(/\s([a-zA-Z]+)/)[1].toLowerCase()});
+        
         // do not process complex nodes (their members are already owned)
-        if ((ownerGraph.getParent().type !== null) && 
+        if ((ownerGraph.getParent().type !== null) &&
+            (ownerGraph.getParent().type)
             (ownerGraph.getParent().isComplex()))
         {
             continue;
@@ -6970,8 +6979,10 @@ SbgnPDLayout.prototype.newEdge = function (vEdge)
  */
 SbgnPDLayout.prototype.layout = function ()
 {
-    var b = false;
+    broadcast({log: "INSIDE-SbgnPDLayout.prototype.layout"});
 
+    var b = false;
+    
     this.groupZeroDegreeMembers();
     this.applyDFSOnComplexes();
     b = CoSELayout.prototype.layout.call(this, arguments);
@@ -9357,6 +9368,8 @@ _SbgnPDLayout.prototype.run = function () {
             }
         }
 
+        log("fill the childrenmap");
+
         //fill the chidrenMap and orphans_t maps to process the nodes in the correct order
         var nodes = pData.nodes;
         for (var i = 0; i < nodes.length; i++) {
@@ -9372,8 +9385,12 @@ _SbgnPDLayout.prototype.run = function () {
             }
         }
 
+        log("process nodes");
+
         processNodes(root_t, orphans_t);
 
+        log("handle the edges");
+        
         //handle the edges
         var edges = pData.edges;
         for (var i = 0; i < edges.length; i++) {
@@ -9383,8 +9400,12 @@ _SbgnPDLayout.prototype.run = function () {
             var e1 = gm_t.add(layout_t.newEdge(), sourceNode, targetNode);
         }
 
+        log("run layout");
+        
         //run the layout crated in this thread
         layout_t.runLayout();
+
+        log("fill the resultmap");
 
         //fill the result map
         for (var id in idToLNode_t) {
