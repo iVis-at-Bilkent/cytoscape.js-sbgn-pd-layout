@@ -332,12 +332,12 @@ _SbgnPDLayout.prototype.run = function () {
 
                 if (theChild.width != null
                         && theChild.height != null) {
-                    theNode = parent.add(new CoSENode(gm_t,
+                    theNode = parent.add(new SbgnPDNode(gm_t,
                             new PointD(theChild.x, theChild.y),
                             new DimensionD(parseFloat(theChild.width),
                                     parseFloat(theChild.height))));
                 } else {
-                    theNode = parent.add(new CoSENode(gm_t));
+                    theNode = parent.add(new SbgnPDNode(gm_t));
                 }
                 theNode.id = theChild.id;
                 idToLNode_t[theChild.id] = theNode;
@@ -423,12 +423,14 @@ _SbgnPDLayout.prototype.run = function () {
             lNode.rect.width = node.w;
             lNode.rect.height = node.h;
         }
-        if (after.options.tile) {
+        /* TODO:
+         * if (after.options.tile) {
             // Repopulate members
-            after.repopulateZeroDegreeMembers(tiledZeroDegreeNodes);
-            after.repopulateCompounds(tiledMemberPack);
+            // TODO:
+            //after.repopulateZeroDegreeMembers(tiledZeroDegreeNodes);
+            //after.repopulateCompounds(tiledMemberPack);
             after.options.eles.nodes().updateCompoundBounds();
-        }
+        }*/
 
         var getPositions = function (i, ele) {
             var theId = ele.data('id');
@@ -1070,12 +1072,12 @@ _SbgnPDLayout.prototype.processChildrenList = function (parent, children) {
 
         if (theChild.width() != null
                 && theChild.height() != null) {
-            theNode = parent.add(new CoSENode(_SbgnPDLayout.layout.graphManager,
+            theNode = parent.add(new SbgnPDNode(_SbgnPDLayout.layout.graphManager,
                     new PointD(theChild.position('x'), theChild.position('y')),
                     new DimensionD(parseFloat(theChild.width()),
                             parseFloat(theChild.height()))));
         } else {
-            theNode = parent.add(new CoSENode(this.graphManager));
+            theNode = parent.add(new SbgnPDNode(this.graphManager));
         }
         theNode.id = theChild.data("id");
         _SbgnPDLayout.idToLNode[theChild.data("id")] = theNode;

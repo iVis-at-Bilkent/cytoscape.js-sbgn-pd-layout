@@ -42,7 +42,15 @@ SbgnPDNode.prototype.getSpringForceX = function ()
 
 SbgnPDNode.prototype.isComplex = function ()
 {
-    return this.type.localeCompare(SbgnPDConstants.COMPLEX) === 0;
+    if (this.type != undefined)
+    {
+        return this.type.localeCompare(SbgnPDConstants.COMPLEX) === 0;
+    }
+    else
+    {
+        return -1;
+    }
+    
 };
 
 SbgnPDNode.prototype.isInputPort = function ()

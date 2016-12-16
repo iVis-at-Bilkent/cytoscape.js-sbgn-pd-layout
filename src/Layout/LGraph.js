@@ -413,6 +413,7 @@ LGraph.prototype.updateConnected = function ()
     for (var i = 0; i < s; i++)
     {
       var neighborEdge = neighborEdges[i];
+      
       currentNeighbor =
               neighborEdge.getOtherEndInGraph(currentNode, this);
 

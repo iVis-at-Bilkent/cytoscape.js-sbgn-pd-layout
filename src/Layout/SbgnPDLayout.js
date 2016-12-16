@@ -149,7 +149,7 @@ SbgnPDLayout.prototype.doPhase2 = function ()
                 this.successRatio = this.properlyOrientedEdgeCount / this.totalEdgeCountToBeOriented;
 
                 if (this.isConverged() && 
-                    successRatio >= SbgnPDConstants.ROTATIONAL_FORCE_CONVERGENCE)
+                    this.successRatio >= SbgnPDConstants.ROTATIONAL_FORCE_CONVERGENCE)
                 {
                     break;
                 }
@@ -221,11 +221,10 @@ SbgnPDLayout.prototype.moveNodes = function ()
     if (((this.totalIterations % SbgnPDConstants.ROTATIONAL_FORCE_ITERATION_COUNT) === 0) && 
         this.phaseNumber === 2)
     {
-        rotateAProcess();
+        this.rotateAProcess();
     }
             
-    // TODO: Original: super.moveNodes();
-    CoSELayout.moveNodes();
+    CoSELayout.prototype.moveNodes.call(this);
 };
 
 SbgnPDLayout.prototype.hasApproximationPeriodReached = function ()
@@ -422,12 +421,12 @@ SbgnPDLayout.prototype.finalEnhancement = function ()
     }
 
     this.properlyOrientedEdgeCount = totalProperEdges;
-    this.enhancedRatio = totalProperEdges / totalEdgeCountToBeOriented;
+    this.enhancedRatio = totalProperEdges / this.totalEdgeCountToBeOriented;
 
     var numOfProcessNodes = this.processNodeList.length;
     for (var i; i<numOfProcessNodes; i++)
     {
-        totalEffCount += this.processNodeList[i].effectorEdges.length;
+        this.totalEffCount += this.processNodeList[i].effectorEdges.length;
     }
 };
 

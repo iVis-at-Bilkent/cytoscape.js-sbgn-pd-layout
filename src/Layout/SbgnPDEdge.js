@@ -1,14 +1,6 @@
 var CoSEEdge = require('./CoSEEdge');
 var SbgnPDConstants = require('./SbgnPDConstants');
 
-function SbgnPDEdge(source, target, vEdge) 
-{
-    CoSEEdge.call(this, source, target, vEdge);
-    
-    this.correspondingAngle = 0;
-    this.isProperlyOriented = false;
-}
-
 function SbgnPDEdge(source, target, vEdge, type) 
 {
     CoSEEdge.call(this, source, target, vEdge);
@@ -18,7 +10,7 @@ function SbgnPDEdge(source, target, vEdge, type)
     this.isProperlyOriented = false; // boolean
 }
 
-CoSEEdge.prototype = Object.create(CoSEEdge.prototype);
+SbgnPDEdge.prototype = Object.create(CoSEEdge.prototype);
 for (var prop in CoSEEdge) {
   SbgnPDEdge[prop] = CoSEEdge[prop];
 }
